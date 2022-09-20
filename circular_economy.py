@@ -9,7 +9,7 @@ import time
 import os
 import sys
 import json
-Bucket = "sample_bucket"
+Bucket = "sample-bucket-cce"
 
 def pushImagetoS3(image):
     """ Method that pushes the image to S3 and alerts through a lambda
