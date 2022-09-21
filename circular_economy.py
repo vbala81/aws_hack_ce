@@ -40,8 +40,10 @@ def storeImage(frame):
     """
     try: 
         timestr = time.strftime("%Y%m%d-%H%M%S")
+        print(directory)
         image = '{0}/image_{1}.png'.format(directory, timestr)
         cv.imwrite(image, frame)
+        # print('Your image was saved to %s' %image) 
     except Exception as excep:
         print('Exception in storeImage process {}' .format(sys.exc_info()))
         raise excep
@@ -90,5 +92,5 @@ def main():
     cv.destroyAllWindows()
 
 dirname = os.path.dirname(__file__)
-directory = os.path.join(dirname, '')
+directory = os.path.join(dirname, 'objects')
 main()
