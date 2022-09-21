@@ -39,6 +39,7 @@ def storeImage(frame):
     """
     try: 
         timestr = time.strftime("%Y%m%d-%H%M%S")
+        print(directory)
         image = '{0}/image_{1}.png'.format(directory, timestr)
         cv.imwrite(image, frame)
         # print ('Your image was saved to %s' %image)
