@@ -90,5 +90,5 @@ def main():
     cv.destroyAllWindows()
 
 dirname = os.path.dirname(__file__)
-directory = os.path.join(dirname, 'objects')
+directory = os.path.join(dirname, '')
 main()
