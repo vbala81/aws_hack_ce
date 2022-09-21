@@ -9,7 +9,7 @@ import time
 import os
 import sys
 import json
-Bucket = "sample-bucket-cce"
+Bucket = "hackathon-ce-bucket"
 
 def pushImagetoS3(image):
     """ Method that pushes the image to S3 and alerts through a lambda
@@ -20,15 +20,16 @@ def pushImagetoS3(image):
             Exception(e) : General Exception when something fails during the process
     """
     try:
+        upload_status = ''
         s3_client = boto3.client('s3')
-        S3_KEY = 'detected_images/'
+        S3_KEY = 'images/'
         with open(image, 'rb') as data:
             upload_status = s3_client.upload_fileobj(data, Bucket, S3_KEY + image)
-        lambda_client = boto3.client('lambda')
         os.remove(image)
     except Exception as excep:
         print('Exception in rekogniseface process {}' .format(sys.exc_info()))
         raise excep
+    return upload_status
 
 def storeImage(frame):	
     """ Method that stores the image in rasp pi in a folder based on frame that is sent through opencv
@@ -39,10 +40,8 @@ def storeImage(frame):
     """
     try: 
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        print(directory)
         image = '{0}/image_{1}.png'.format(directory, timestr)
         cv.imwrite(image, frame)
-        # print ('Your image was saved to %s' %image)
     except Exception as excep:
         print('Exception in storeImage process {}' .format(sys.exc_info()))
         raise excep
