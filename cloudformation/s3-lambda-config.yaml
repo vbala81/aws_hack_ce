@@ -412,15 +412,8 @@ Resources:
             Resource:
             - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName]]
             - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName, '/*']]
-      - PolicyName: AWSLambdaRekognition
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Resource: 
-            - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName]]
-            - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName, '/*']]
-            Action:  "rekognition:*"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonRekognitionFullAccess
 
   ProcessingLambdaPermission:
     Type: AWS::Lambda::Permission
