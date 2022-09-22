@@ -1,0 +1,438 @@
+##########################################################
+# Filename: s3-bucket.yaml
+
+# Version History : v1: #  Authored by Nikhil + Andrew using CHAMP S3 template. Removed extra optional configurations for a cleaner template.
+############################################################
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Common S3 Storage Template
+Parameters:
+  NotificationBucketName:
+    Type: String
+    Description: A name for the bucket. Must be globally unique.
+    Default: "hackathon-ce-bucket"
+    AllowedPattern: "^[a-z0-9.-]*$"
+  DataRetentionRequirement:
+    Type: String
+    Description: How long does data need to be kept in this bucket before being removed?
+    Default: '2555'
+    AllowedPattern: ^[0-9]*$
+    ConstraintDescription: must only contain numbers
+  BucketVersioning:
+    Type: String
+    Description: Turn versioning on for the bucket
+    Default: false
+    AllowedValues: [true, false]
+  BucketSecurity:
+    Default: '1'
+    Type: String
+    Description: Security level of bucket
+    ConstraintDescription: Must reflect the level of security needed 1, 2, 3 (3 is max level)
+    AllowedValues:
+      - '1'
+      - '2'
+      - '3'
+  EncryptionType:
+    Type: String 
+    Description: Server-side encryption with Amazon S3-managed keys (SSE-S3) or AWS KMS-managed keys (SSE-KMS)
+    Default: 'SSE-S3'
+    AllowedValues: 
+      - 'SSE-S3'
+      - 'SSE-KMS'
+  KMSMasterKeyID:
+    Type: String 
+    Description: KMS key ID to use for the default encryption (Leave blank if using SSE-S3)
+    Default: ''       
+  LambdaFunctionName:
+    Type: String
+    Description: Lambda Function Name
+  S3BucketNameWhereCodeLives:
+    Type: String
+    Description: S3 Bucket to Upload Lambda Code
+  LambdaExectionRoleName:
+    Type: String
+    Description: Lambda IAM Role
+
+Conditions:
+  Versioning:
+    !Equals [true, !Ref BucketVersioning]
+  KMSKeyProvided:
+    !Not [!Equals ["", !Ref KMSMasterKeyID]]
+  EncryptionCheck:
+    !Equals ['SSE-S3', !Ref EncryptionType]
+
+Resources:
+  DataBucket:
+    Type: "AWS::S3::Bucket"
+    DependsOn: ProcessingLambdaPermission
+    Properties:
+      BucketName: !Ref NotificationBucketName          
+      AccessControl: Private
+      Tags:
+        - Key:   Project
+          Value: Sustainability Hackathon
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: !If [EncryptionCheck, AES256, 'aws:kms']
+              KMSMasterKeyID: !If 
+              - KMSKeyProvided
+              - !Ref KMSMasterKeyID
+              - !Ref AWS::NoValue
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: !Ref DataRetentionRequirement
+            Id: DataBucketLifecycle
+            Status: Enabled
+            Transitions:
+              - # Move all objects to S3 Intelligent Tiering after 30 days
+                StorageClass: INTELLIGENT_TIERING # TODO: Update to Intelligent tiering once Cloud formation catches up
+                TransitionInDays: 30
+              - # Move all objects to Glacier after 180 days
+                StorageClass: GLACIER
+                TransitionInDays: 180
+      MetricsConfigurations:
+        - Id:
+            Fn::Join:
+              - '-'
+              -
+                - !Ref NotificationBucketName 
+                - 'metric'
+          Prefix: !Ref NotificationBucketName
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt LambdaFunction.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .png
+      VersioningConfiguration:
+        Status: !If [Versioning, Enabled, Suspended]
+      PublicAccessBlockConfiguration: # Reference https://aws.amazon.com/blogs/aws/amazon-s3-block-public-access-another-layer-of-protection-for-your-accounts-and-buckets/
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: DataBucket
+      PolicyDocument:
+        Statement:
+          -
+            Sid: SecureTransportForAllActions # Requires that all objects utilize secure transport
+            Action:
+              - "s3:*"
+            Effect: "Deny"
+            Resource:
+              - Fn::Join:
+                - ""
+                -
+                  - !GetAtt  DataBucket.Arn
+                  - "/*"
+            Principal: "*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          -
+            Sid: DenyPublicReadACL # Deny public updating of ACL
+            Action:
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl:
+                  - "public-read"
+                  - "public-read-write"
+                  - "authenticated-read"
+            Effect: "Deny"
+            Principal: "*"
+            Resource:
+              Fn::Join:
+              - ""
+              -
+                - "arn:"
+                - Ref: "AWS::Partition"
+                - ":s3:::"
+                -
+                  Ref: "DataBucket"
+                - "/*"
+          -
+            Sid: DenyPublicReadGrant
+            Action:
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+            Condition:
+              StringLike:
+                s3:x-amz-grant-read:
+                  - "*http://acs.amazonaws.com/groups/global/AllUsers*"
+                  - "*http://acs.amazonaws.com/groups/global/AuthenticatedUsers*"
+            Effect: "Deny"
+            Principal: "*"
+            Resource:
+              Fn::Join:
+              - ""
+              -
+                - "arn:"
+                - Ref: "AWS::Partition"
+                - ":s3:::"
+                -
+                  Ref: "DataBucket"
+                - "/*"
+          -
+            Sid: DenyPublicListACL
+            Action:
+              - "s3:PutBucketAcl"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl:
+                  - "public-read"
+                  - "public-read-write"
+                  - "authenticated-read"
+            Effect: "Deny"
+            Principal: "*"
+            Resource:
+              - Fn::Join:
+                - ""
+                -
+                  - "arn:"
+                  - Ref: "AWS::Partition"
+                  - ":s3:::"
+                  -
+                    Ref: "DataBucket"
+                  - "/*"
+              - Fn::Join:
+                - ""
+                -
+                  - "arn:"
+                  - Ref: "AWS::Partition"
+                  - ":s3:::"
+                  -
+                    Ref: "DataBucket"
+          -
+            Sid: DenyPublicListGrant
+            Action:
+              - "s3:PutBucketAcl"
+            Condition:
+              StringLike:
+                s3:x-amz-grant-read:
+                  - "*http://acs.amazonaws.com/groups/global/AllUsers*"
+                  - "*http://acs.amazonaws.com/groups/global/AuthenticatedUsers*"
+            Effect: "Deny"
+            Principal: "*"
+            Resource:
+              - Fn::Join:
+                - ""
+                -
+                  - "arn:"
+                  - Ref: "AWS::Partition"
+                  - ":s3:::"
+                  -
+                    Ref: "DataBucket"
+                  - "/*"
+              - Fn::Join:
+                - ""
+                -
+                  - "arn:"
+                  - Ref: "AWS::Partition"
+                  - ":s3:::"
+                  -
+                    Ref: "DataBucket"
+          -
+            Sid: DenyAnonymousRequestsP
+
+            Action:
+              - "s3:ListBucket"
+            Condition:
+              StringEqualsIfExists:
+                aws:principaltype: "Anonymous"
+            Effect: "Deny"
+            Principal: "*"
+            Resource:
+              - Fn::Join:
+                - ""
+                -
+                  - "arn:"
+                  - Ref: "AWS::Partition"
+                  - ":s3:::"
+                  -
+                    Ref: "DataBucket"
+                  - "/*"
+              - Fn::Join:
+                - ""
+                -
+                  - "arn:"
+                  - Ref: "AWS::Partition"
+                  - ":s3:::"
+                  -
+                    Ref: "DataBucket"
+          -
+            Sid: ManagementRolePolicy
+            Action:
+              - "s3:*"
+            Effect: "Allow"
+            Principal:
+              AWS:
+                - !GetAtt  S3ManagementRole.Arn
+            Resource:
+              - Fn::Join:
+                - ""
+                -
+                  - !GetAtt  DataBucket.Arn
+                  - "/*"
+              - !GetAtt  DataBucket.Arn
+
+  S3ManagementRole:
+    DeletionPolicy: Delete # IAM Management role remains in place in case a delete fails so the bucket can still be managed
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - autoscaling.amazonaws.com
+                - s3.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+            Condition:
+              Bool:
+                aws:MultiFactorAuthPresent: "true"
+      Path: /
+      Policies:
+        -
+          PolicyName:
+            Fn::Join:
+              - '-'
+              -
+                - !Ref NotificationBucketName
+                - 'management-policy'
+                - !Ref BucketSecurity
+                - !Ref "AWS::Region"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Sid: ManageS3Bucket
+                Effect: "Allow"
+                Action: 
+                  - "s3:List*"
+                  - "s3:Create*"
+                  - "s3:Put*"
+                  - "s3:Describe*"
+                  - "s3:Get*"
+                  - "s3:Put*"
+                Resource:
+                  - !GetAtt  DataBucket.Arn
+                  -
+                    Fn::Join:
+                    - ""
+                    -
+                      - !GetAtt  DataBucket.Arn
+                      - "/*"
+              -
+                Sid: ListRole
+                Effect: "Allow"
+                Action:
+                  - "cloudwatch:Describe*"
+                  - "cloudwatch:List*"
+                  - "cloudwatch:Get*"
+                  - "logs:Describe*"
+                  - "logs:Get*"
+                Resource: "*"
+              -
+                Sid: StackRole
+                Effect: "Allow"
+                Action:
+                  - "cloudformation:*"
+                Resource:
+                  - !Ref AWS::StackId
+      Tags:
+        - Key:   Bucket
+          Value: !Ref NotificationBucketName
+      RoleName:
+        Fn::Join:
+          - '-'
+          -
+            - !Ref NotificationBucketName
+            - 'management-role'
+            - !Ref BucketSecurity
+            - !Ref "AWS::Region"
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Handler: lambda_function.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Code:
+        S3Bucket: !Ref S3BucketNameWhereCodeLives
+        S3Key: lambda_function.zip
+      Runtime: python3.9
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref LambdaExectionRoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: AWSLambdaBasicExecutionRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+      - PolicyName: AWSLambdaS3Permissions
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:*
+            Resource:
+            - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName]]
+            - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName, '/*']]
+      - PolicyName: AWSLambdaRekognition
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Resource: 
+            - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName]]
+            - !Join ['', ['arn:aws:s3:::', !Ref NotificationBucketName, '/*']]
+            Action:  "rekognition:*"
+
+  ProcessingLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref LambdaFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub 'arn:aws:s3:::${NotificationBucketName}'
+      SourceAccount: !Ref AWS::AccountId
+
+Outputs:
+  DataBucket:
+    Value: !Ref DataBucket
+  S3ManagementRole:
+    Value: !Ref S3ManagementRole

@@ -1,0 +1,18 @@
+[
+    {
+      "ParameterKey": "NotificationBucketName",
+      "ParameterValue": "hackathon-ce-bucket"
+    },
+    {
+      "ParameterKey": "LambdaFunctionName",
+      "ParameterValue": "CircularEconomyLambda"
+    },
+    {
+      "ParameterKey": "S3BucketNameWhereCodeLives",
+      "ParameterValue": "hackathon-ce-bucket"
+    },
+    {
+      "ParameterKey": "LambdaExectionRoleName",
+      "ParameterValue": "LambdaExecutionRole"
+    }
+]
