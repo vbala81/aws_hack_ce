@@ -1,5 +1,5 @@
 ##########################################################
-# Filename: s3-bucket.yaml
+# Filename: s3-lambda-config.yaml
 
 # Version History : v1: #  Authored by Nikhil + Andrew using CHAMP S3 template. Removed extra optional configurations for a cleaner template.
 ############################################################
