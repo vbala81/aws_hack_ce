@@ -12,7 +12,22 @@ import json
 from gpiozero import LED
 from gpiozero import MotionSensor
 Bucket = "hackathon-ce-bucket"
+green_led = LED(17)
+pir = MotionSensor(4)
+green_led.off()
 
+def detect_motion():
+    """Method that detects motion
+    """
+    while True:
+        pir.wait_for_motion()
+        print("Motion Detected")
+        green_led.on()
+        pir.wait_for_no_motion()
+        green_led.off()
+        print("No Motion")
+        
+def detect_object(camera):
 def pushImagetoS3(image):
     """ Method that pushes the image to S3 and alerts through a lambda
             if it detects a recyclable object
@@ -51,19 +66,7 @@ def storeImage(frame):
         raise excep
     return image
 
-def detect_motion():
-    """Method that detects motion
-    """
-    green_led = LED(17)
-    pir = MotionSensor(4)
-    green_led.off()
-    while True:
-        pir.wait_for_motion()
-        print("Motion Detected")
-        green_led.on()
-        pir.wait_for_no_motion()
-        print("No Motion")
-        green_led.off()
+
 
 def main():	
     """ Main method that orchestrates all the steps
