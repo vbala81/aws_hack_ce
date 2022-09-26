@@ -9,6 +9,8 @@ import time
 import os
 import sys
 import json
+from gpiozero import LED
+from gpiozero import MotionSensor
 Bucket = "hackathon-ce-bucket"
 
 def pushImagetoS3(image):
@@ -48,6 +50,20 @@ def storeImage(frame):
         print('Exception in storeImage process {}' .format(sys.exc_info()))
         raise excep
     return image
+
+def detect_motion():
+    """Method that detects motion
+    """
+    green_led = LED(17)
+    pir = MotionSensor(4)
+    green_led.off()
+    while True:
+        pir.wait_for_motion()
+        print("Motion Detected")
+        green_led.on()
+        pir.wait_for_no_motion()
+        print("No Motion")
+        green_led.off()
 
 def main():	
     """ Main method that orchestrates all the steps
@@ -93,4 +109,4 @@ def main():
 
 dirname = os.path.dirname(__file__)
 directory = os.path.join(dirname, 'objects')
-main()
+detect_motion()
