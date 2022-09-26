@@ -24,10 +24,9 @@ def detect_motion():
         print("Motion Detected")
         green_led.on()
         pir.wait_for_no_motion()
-        green_led.off()
         print("No Motion")
-        
-def detect_object(camera):
+        green_led.off()
+
 def pushImagetoS3(image):
     """ Method that pushes the image to S3 and alerts through a lambda
             if it detects a recyclable object
@@ -65,8 +64,6 @@ def storeImage(frame):
         print('Exception in storeImage process {}' .format(sys.exc_info()))
         raise excep
     return image
-
-
 
 def main():	
     """ Main method that orchestrates all the steps
