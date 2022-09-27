@@ -16,7 +16,7 @@ Bucket = "hackathon-ce-bucket"
 
 GPIO.setmode(GPIO.BOARD)  # Set GPIO to pin numbering
 pir = 8  # Assign pin 8 to PIR
-led = 17  # Assign pin 10 to LED
+led = 10  # Assign pin 10 to LED
 GPIO.setup(pir, GPIO.IN)  # Setup GPIO pin PIR as input
 GPIO.setup(led, GPIO.OUT)  # Setup GPIO pin for LED as output
 print("Sensor initializing . . .")
