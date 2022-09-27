@@ -14,6 +14,7 @@ from gpiozero import MotionSensor
 import RPi.GPIO as GPIO
 Bucket = "hackathon-ce-bucket"
 
+GPIO.setmode(GPIO.BOARD)  # Set GPIO to pin numbering
 pir = 8  # Assign pin 8 to PIR
 led = 17  # Assign pin 10 to LED
 GPIO.setup(pir, GPIO.IN)  # Setup GPIO pin PIR as input
