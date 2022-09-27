@@ -30,6 +30,7 @@ def detect_motion():
     """
     try:
         while True:
+            print(GPIO.input(pir))
             if (GPIO.input(pir) is True):  # If PIR pin goes high, motion is detected
                 print("Motion Detected!")
                 GPIO.output(led, True)  # Turn on LED
