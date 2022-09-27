@@ -1,4 +1,4 @@
-# Python program that uses rasp pi camera and AWS Rekogition to detect an image and alert 
+# Python program that uses rasp pi camera and AWS Rekogition to detect an image and alert
 # if a recyclable object is detected
 
 from picamera import PiCamera
@@ -11,21 +11,37 @@ import sys
 import json
 from gpiozero import LED
 from gpiozero import MotionSensor
+import RPi.GPIO as GPIO
 Bucket = "hackathon-ce-bucket"
-green_led = LED(17)
-pir = MotionSensor(4)
-green_led.off()
+
+pir = 8  # Assign pin 8 to PIR
+led = 17  # Assign pin 10 to LED
+GPIO.setup(pir, GPIO.IN)  # Setup GPIO pin PIR as input
+GPIO.setup(led, GPIO.OUT)  # Setup GPIO pin for LED as output
+print("Sensor initializing . . .")
+time.sleep(2)  # Give sensor time to startup
+print("Active")
+print("Press Ctrl+c to end program")
+
 
 def detect_motion():
     """Method that detects motion
     """
-    while True:
-        pir.wait_for_motion()
-        print("Motion Detected")
-        green_led.on()
-        pir.wait_for_no_motion()
-        print("No Motion")
-        green_led.off()
+    try:
+        while True:
+            if (GPIO.input(pir) is True):  # If PIR pin goes high, motion is detected
+                print("Motion Detected!")
+                GPIO.output(led, True)  # Turn on LED
+                time.sleep(4)  # Keep LED on for 4 seconds
+                GPIO.output(led, False)  # Turn off LED
+                time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupted ")
+    finally:
+        GPIO.output(led, False)  # Turn off LED in case left on
+        GPIO.cleanup()  # reset all GPIO
+        print("Program ended")
 
 def pushImagetoS3(image):
     """ Method that pushes the image to S3 and alerts through a lambda
