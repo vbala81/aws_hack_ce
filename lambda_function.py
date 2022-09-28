@@ -1,79 +1,116 @@
-import datetime
-import time
 import boto3 
 from botocore.exceptions import ClientError
 import urllib.parse
+import sys
+import rds_config
+import pymysql
+from datetime import datetime
 
 #GLOBAL VARIABLES
-s3_bucket_name = 'hackathon-ce-bucket'
+BUCKET = 'hackathon-ce-bucket'
+FEATURES_BLACKLIST = ["Landmarks", "Emotions", "Pose", "Quality", "BoundingBox"]
 
-def get_event_date(event):
-    if "timestamp" in event[0]:
-        mytimestamp = datetime.datetime.fromtimestamp(event[0]["timestamp"])
-    else:
-        mytimestamp = datetime.datetime.fromtimestamp(time.time())
-    return mytimestamp.strftime("%Y%m%d")
+rds_host = 'iot-test.chfqqrhe8otz.us-east-1.rds.amazonaws.com'
+name = rds_config.db_username
+password = rds_config.db_password
+db_name = rds_config.db_name
 
-def lambda_handler(event, context):
-    # print("Received event: " + json.dumps(event, indent=2))
-    rekognition_client = boto3.client('rekognition')
-    # Get the object from the event and show its content type
-    image = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'], encoding='utf-8')
-    print("Image is ")
-    print(image)
+#SETUP DATABASE CONNECTIVITY
+try:
+    conn = pymysql.connect(host=rds_host, user=name, passwd=password, db=db_name, connect_timeout=5)
+    print('Connection to RDS MySQL instance succeeded.')
+except pymysql.MySQLError as e:
+    print("ERROR: Unexpected error: Could not connect to MySQL instance.")
+    print(e)
+    sys.exit()
+
+def detect_labels(bucket, key, max_labels=10, min_confidence=90, region="us-east-1"):
+    rekognition_client = boto3.client('rekognition', region)
     try:
         response = rekognition_client.detect_labels(
             Image={
                     "S3Object": {
-                        "Bucket": s3_bucket_name,
-                        "Name": image
+                        "Bucket": bucket,
+                        "Name": key
                     }
             },
-            MinConfidence=70)
-        print(response)
-        
-        labels = response["Labels"]
-        organic_waste = 0
-        hazardous_waste = 0
-        recyclable_paper = 0
-        recyclable_clothing = 0
-        recyclable_cans = 0
-        other_waste = 0
-        organic_waste_dict = [
-            "orange", "bread", "banana", "orange peel", "apple", "onion", "vegatable", "potato"
-        ]
-        recyclable_paper_dict = [
-            "cardboard", "plastic", "paper", "bottle", "polethene", "paper ball"
-        ]
-        recyclable_clothing_dict = [
-            "jeans", "pants", "shirts", "shoes", "sneakers", "socks"
-        ]
-        recyclable_cans_dict = [
-            "can", "bottle", "soda"
-        ]
-        hazardous_waste_dict = ["batteries"]
-        
-        for label in labels:
-            if label["Name"].lower() in organic_waste_dict:
-                organic_waste += 1
-            elif label["Name"].lower() in hazardous_waste_dict:
-                hazardous_waste += 1
-            elif label["Name"].lower() in recyclable_paper_dict:
-                recyclable_paper += 1
-            elif label["Name"].lower() in recyclable_clothing_dict:
-                recyclable_clothing += 1
-            elif label["Name"].lower() in recyclable_cans_dict:
-                recyclable_cans += 1
-            else:
-                other_waste += 1
-
-        print('Organic Waste Item Count: ', organic_waste)
-        print('Hazardous Waste Item Count: ', hazardous_waste)
-        print('Recyclable Paper Item Count: ', recyclable_paper)
-        print('Recyclable Clothing Item Count: ', recyclable_clothing)
-        print("Recyclable Canned Item Count: ", recyclable_cans)
-        
-        return True
+            MaxLabels=max_labels,
+            MinConfidence=min_confidence)
+        return response['Labels']
     except ClientError as e:
         print(e)
         raise e
+
+def lambda_handler(event, context):
+    # Get the object from the event and show its content type
+    image = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'], encoding='utf-8')
+    print("Image is ")
+    print(image)
+    """
+    Item                                    Unit       Emissions that could be saved by recycling           Energy that could be saved                              Water that could be saved
+    PET Plastic Water or Soda Bottle        1 bottle            24.84 g CO2 equivalent                              5774 Kwh                                    
+    Paper source                            1 ton               1000 kg Co2 equivalent           enough to power avg American home for 6 months                     7000 gallons (26,000 liters)
+    Aluminum Cans                           12 cans             1.18 kg Co2 equivalent   save enough energy to power a typical passenger car for more than 3 miles    
+    Cardboard                               1 ton               403.5 kg CO2                every ton recycled saved enough energy to fuel 1000 miles driven in a car      7000 tons of water
+    """
+    
+    bottles_dict = ["water", "bottle", "plastic bottle", "mineral water"]
+    bottles_id = '1'
+    cans_dict = ["can", "cans", "soda", "soda can", "aluminum can"]
+    cans_id = '2'
+    paper_dict = ["paper", "polyethene", "coffee cup"]
+    paper_id = '3'
+    cardboard_dict = ["cardboard"]
+    cardboard_id = '4'
+
+    batteries_dict = ["batteries"]
+    batteries_id = '5'
+
+    bottles = 0
+    paper = 0
+    cans = 0
+    cardboard = 0
+    batteries = 0
+    other_waste = 0
+
+    #Timestamp
+    ts = datetime.now().isoformat(timespec='seconds')
+
+    cursor = conn.cursor()
+    cursor.execute('use IOT') #Name of database where objects live
+    #Persist into "Waste_collection"
+    for label in detect_labels(BUCKET, image):
+        print(label)
+        print("{Name} - {Confidence}%".format(**label))
+                
+        if label["Name"].lower() in batteries_dict:
+            batteries += 1
+        elif label["Name"].lower() in bottles_dict:
+            print('Item analyzed to be a bottle.')
+            params = (ts, bottles_id)
+            bottles += 1
+        elif label["Name"].lower() in paper_dict:
+            print('Item analyzed to be paper.')
+            params = (ts, paper_id)
+            paper += 1
+        elif label["Name"].lower() in cans_dict:
+            print('Item analyzed to be a can.')
+            params = (ts, cans_id)
+            cans += 1
+        elif label["Name"].lower() in cardboard_dict:
+            print('Item analyzed to be cardboard.')
+            params = (ts, cardboard_id)
+            cardboard += 1
+        else:
+            other_waste += 1
+            
+    insert = 'INSERT INTO Waste_collection (TIME_STAMP, OBJECT_ID) VALUES (%s, %s)'
+    cursor.execute(insert, params)
+
+    # print('Hazardous Waste Item Count: ', batteries_dict)
+    print("Recyclable Bottles Item Count: ", bottles)
+    print('Recyclable Paper Item Count: ', paper)
+    print("Recyclable Canned Item Count: ", cans)
+    print("Recyclable Cardboard Item Count: ", cardboard)
+    
+    conn.commit() #Persist to db and close connection
