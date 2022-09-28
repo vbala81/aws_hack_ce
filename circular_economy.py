@@ -75,7 +75,6 @@ def storeImage(frame):
     """
     try: 
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        print(directory)
         image = '{0}/image_{1}.png'.format(directory, timestr)
         cv.imwrite(image, frame)
         # print('Your image was saved to %s' %image) 
@@ -105,22 +104,18 @@ def main():
         exit(0)
     print('New Object getting pushed to S3')
     # initialize reckognition sdk
-    while True:
-        frame = {}
-        # calling read() twice as a workaround to clear the buffer.
-        cam.read()
-        cam.read()
-        success, frame = cam.read()
-        if not success:
-            sys.exit(
-                'ERROR: Unable to read from webcam. Please verify your webcam settings.'
-            )        
-        image = storeImage(frame)
-        if image is not None:
-            pushImagetoS3(image)
-
-        if cv.waitKey(20) & 0xFF == ord('q'):
-            break
+    frame = {}
+    # calling read() twice as a workaround to clear the buffer.
+    cam.read()
+    cam.read()
+    success, frame = cam.read()
+    if not success:
+        sys.exit(
+            'ERROR: Unable to read from webcam. Please verify your webcam settings.'
+        )        
+    image = storeImage(frame)
+    if image is not None:
+        pushImagetoS3(image)
 
     # When everything done, release the capture
     cam.release()
