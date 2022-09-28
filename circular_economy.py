@@ -91,7 +91,7 @@ def main():
     parser = argparse.ArgumentParser(description='Object recognition')
     parser.add_argument('--camera', help='Camera device number.', type=int, default=0)
     args = parser.parse_args()
-
+    print('Start image capture')
     camera_device = args.camera
 
     # Read the video stream
@@ -103,7 +103,7 @@ def main():
     if not cam.isOpened:
         print('--(!)Error opening video capture')
         exit(0)
-
+    print('New Object getting pushed to S3')
     # initialize reckognition sdk
     while True:
         frame = {}
