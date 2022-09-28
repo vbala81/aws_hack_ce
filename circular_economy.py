@@ -37,6 +37,7 @@ def detect_motion():
                 time.sleep(4)  # Keep LED on for 4 seconds
                 GPIO.output(led, False)  # Turn off LED
                 time.sleep(0.1)
+                main()
 
     except KeyboardInterrupt:
         print("Keyboard interrupted ")
