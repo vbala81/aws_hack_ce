@@ -19,7 +19,6 @@ pir = 8  # Assign pin 8 to PIR
 led = 10  # Assign pin 10 to LED
 GPIO.setup(pir, GPIO.IN)  # Setup GPIO pin PIR as input
 print("Sensor initializing . . .")
-time.sleep(20)  # Give sensor time to startup
 print("Active")
 print("Press Ctrl+c to end program")
 
