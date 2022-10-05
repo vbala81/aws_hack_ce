@@ -19,7 +19,7 @@ pir = 8  # Assign pin 8 to PIR
 led = 10  # Assign pin 10 to LED
 GPIO.setup(pir, GPIO.IN)  # Setup GPIO pin PIR as input
 print("Sensor initializing . . .")
-time.sleep(40)  # Give sensor time to startup
+time.sleep(20)  # Give sensor time to startup
 print("Active")
 print("Press Ctrl+c to end program")
 
@@ -41,7 +41,7 @@ def detect_motion():
     except KeyboardInterrupt:
         print("Keyboard interrupted ")
     finally:
-        GPIO.output(led, False)  # Turn off LED in case left on
+        # GPIO.output(led, False)  # Turn off LED in case left on
         GPIO.cleanup()  # reset all GPIO
         print("Program ended")
 
