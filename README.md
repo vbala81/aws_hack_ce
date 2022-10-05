@@ -160,7 +160,7 @@ If you’re using a Picamera, make sure it is enabled in the Raspberry Pi config
   <img src="camera_enabled.png">
 </p>
 
-Run the script by issuing and you can see below output: 
+Run the script by issuing below command to recognize the image based on motion detected through rasp pi and push the image to S3 after which a Lambda is triggered that populates the RDS Aurora database based on the recycled/compost objects. Data populated is then cascaded to Quicksight which helps in identify anamolies through Dashboard and Analysis: 
 ```
 python3 circular_economy.py 
 ```
