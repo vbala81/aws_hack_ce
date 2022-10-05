@@ -32,7 +32,7 @@ def detect_motion():
             if (gpio_input == 1):  # If PIR pin goes high, motion is detected
                 print("Motion Detected!")
                 # GPIO.output(led, True)  # Turn on LED
-                time.sleep(4)  # Keep LED on for 4 seconds
+                time.sleep(1)  # Keep LED on for 4 seconds
                 # GPIO.output(led, False)  # Turn off LED
                 # time.sleep(0.1)
                 main()
