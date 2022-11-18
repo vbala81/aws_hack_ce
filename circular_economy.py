@@ -31,10 +31,7 @@ def detect_motion():
             gpio_input = GPIO.input(pir)
             if (gpio_input == 1):  # If PIR pin goes high, motion is detected
                 print("Motion Detected!")
-                # GPIO.output(led, True)  # Turn on LED
-                time.sleep(1)  # Keep LED on for 4 seconds
-                # GPIO.output(led, False)  # Turn off LED
-                # time.sleep(0.1)
+                time.sleep(1)  
                 main()
 
     except KeyboardInterrupt:
@@ -121,4 +118,5 @@ def main():
 
 dirname = os.path.dirname(__file__)
 directory = os.path.join(dirname, 'objects')
+time.sleep(3)
 detect_motion()
